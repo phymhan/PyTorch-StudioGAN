@@ -345,10 +345,11 @@ def calculate_all_sn(model):
                     else:
                         operation = getattr(model, operation_name)
 
-                weight_orig = reshape_weight_to_matrix(operation.weight_orig)
-                weight_u = operation.weight_u
-                weight_v = operation.weight_v
-                sigmas[name] = torch.dot(weight_u, torch.mv(weight_orig, weight_v))
+                if hasattr(operation, 'weight_orig'):
+                    weight_orig = reshape_weight_to_matrix(operation.weight_orig)
+                    weight_u = operation.weight_u
+                    weight_v = operation.weight_v
+                    sigmas[name] = torch.dot(weight_u, torch.mv(weight_orig, weight_v))
     return sigmas
 
 
