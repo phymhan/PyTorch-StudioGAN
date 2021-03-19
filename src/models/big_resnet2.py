@@ -370,7 +370,7 @@ class Discriminator(nn.Module):
             elif self.conditional_strategy == 'P2GAN':
                 self.linear_p = snlinear(in_features=self.out_dims[-1], out_features=num_classes)
                 self.linear_q = snlinear(in_features=self.out_dims[-1], out_features=num_classes)
-                self.linear_wx = linear(in_features=self.out_dims[-1], out_features=1)  # lambda, only supports linear for now
+                self.linear_w = linear(in_features=self.out_dims[-1], out_features=1)  # lambda, only supports linear for now
             else:
                 pass
         else:
@@ -387,7 +387,7 @@ class Discriminator(nn.Module):
             elif self.conditional_strategy == 'P2GAN':
                 self.linear_p = linear(in_features=self.out_dims[-1], out_features=num_classes)
                 self.linear_q = linear(in_features=self.out_dims[-1], out_features=num_classes)
-                self.linear_wx = linear(in_features=self.out_dims[-1], out_features=1)  # lambda
+                self.linear_w = linear(in_features=self.out_dims[-1], out_features=1)  # lambda
             else:
                 pass
 
@@ -433,9 +433,9 @@ class Discriminator(nn.Module):
                 # proj = torch.sum(torch.mul(self.embedding(label), h), 1)
                 proj_p = torch.squeeze(self.linear_p(h))
                 proj_q = torch.squeeze(self.linear_q(h))
-                out_wx = torch.squeeze(self.linear_wx(h.detach()))
+                out_w = torch.squeeze(self.linear_wx(h.detach()))
                 authen_output = authen_output + proj_p[range(batch_size), label] - proj_q[range(batch_size), label]
-                return authen_output, proj_p, proj_q, out_wx
+                return authen_output, proj_p, proj_q, out_w
 
             elif self.conditional_strategy == 'ACGAN':
                 authen_output = torch.squeeze(self.linear1(h))
