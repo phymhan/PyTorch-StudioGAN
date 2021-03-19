@@ -274,6 +274,8 @@ def calc_derv4gp(netD, conditional_strategy, real_data, fake_data, real_labels, 
         _, _, disc_interpolates = netD(interpolates, real_labels)
     elif conditional_strategy in ['ProjGAN', 'no']:
             disc_interpolates = netD(interpolates, real_labels)
+    elif conditional_strategy in ['P2GAN']:
+        disc_interpolates, _, _, _ = netD(interpolates, real_labels)
     elif conditional_strategy == 'ACGAN':
         _, disc_interpolates = netD(interpolates, real_labels)
     else:
@@ -304,6 +306,8 @@ def calc_derv4dra(netD, conditional_strategy, real_data, real_labels, device):
         _, _, disc_interpolates = netD(interpolates, real_labels)
     elif conditional_strategy in ['ProjGAN', 'no']:
             disc_interpolates = netD(interpolates, real_labels)
+    elif conditional_strategy in ['P2GAN']:
+        disc_interpolates, _, _, _ = netD(interpolates, real_labels)
     elif conditional_strategy == 'ACGAN':
         _, disc_interpolates = netD(interpolates, real_labels)
     else:
@@ -326,6 +330,8 @@ def calc_derv(inputs, labels, netD, conditional_strategy, device, netG=None):
         _, _, dis_out_fake = netD(fake_images, labels)
     elif conditional_strategy in ['ProjGAN', 'no']:
         dis_out_fake = netD(fake_images, labels)
+    elif conditional_strategy in ['P2GAN']:
+        dis_out_fake, _, _, _ = netD(fake_images, labels)
     elif conditional_strategy == 'ACGAN':
         _, dis_out_fake = netD(fake_images, labels)
     else:
