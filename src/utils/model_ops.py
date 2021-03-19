@@ -9,7 +9,8 @@ import torch
 import torch.nn as nn
 from torch.nn.utils import spectral_norm
 from torch.nn import init
-
+import pdb
+st = pdb.set_trace
 
 
 def init_weights(modules, initialize):
@@ -43,6 +44,15 @@ def init_weights(modules, initialize):
         else:
             pass
 
+def init_weight_zero(module):
+    param = module
+    w = getattr(param, 'weight', None)
+    b = getattr(param, 'bias', None)
+    st()
+    if w is not None:
+        w.data.fill_(0.)
+    if b is not None:
+        b.data.fill_(0.)
 
 def conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True):
     return nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size,
