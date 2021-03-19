@@ -370,7 +370,7 @@ class Discriminator(nn.Module):
             elif self.conditional_strategy == 'P2GAN':
                 self.linear_p = snlinear(in_features=self.out_dims[-1], out_features=num_classes)
                 self.linear_q = snlinear(in_features=self.out_dims[-1], out_features=num_classes)
-                self.linear_wx = snlinear(in_features=self.out_dims[-1], out_features=1)  # lambda
+                self.linear_wx = linear(in_features=self.out_dims[-1], out_features=1)  # lambda, only supports linear for now
             else:
                 pass
         else:
