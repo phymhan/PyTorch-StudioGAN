@@ -395,7 +395,7 @@ class Discriminator(nn.Module):
         if initialize is not False:
             init_weights(self.modules, initialize)
         if self.conditional_strategy == 'P2GAN':
-            init_weight_zero(self.linear_wx)
+            init_weight_zero(self.linear_w)
 
 
     def forward(self, x, label, evaluation=False):
@@ -433,7 +433,7 @@ class Discriminator(nn.Module):
                 # proj = torch.sum(torch.mul(self.embedding(label), h), 1)
                 proj_p = torch.squeeze(self.linear_p(h))
                 proj_q = torch.squeeze(self.linear_q(h))
-                out_w = torch.squeeze(self.linear_wx(h.detach()))
+                out_w = torch.squeeze(self.linear_w(h.detach()))
                 authen_output = authen_output + proj_p[range(batch_size), label] - proj_q[range(batch_size), label]
                 return authen_output, proj_p, proj_q, out_w
 
