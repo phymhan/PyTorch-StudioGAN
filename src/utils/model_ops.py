@@ -48,7 +48,6 @@ def init_weight_zero(module):
     param = module
     w = getattr(param, 'weight', None)
     b = getattr(param, 'bias', None)
-    st()
     if w is not None:
         w.data.fill_(0.)
     if b is not None:

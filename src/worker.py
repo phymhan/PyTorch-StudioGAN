@@ -125,7 +125,7 @@ class make_worker(object):
         self.sigma_noise = cfgs.sigma_noise
 
         self.weighted_loss = cfgs.weighted_loss
-        self.weighted_loss_penalty = cfg.weighted_loss_penalty
+        self.weighted_loss_penalty = cfgs.weighted_loss_penalty
 
         self.diff_aug = cfgs.diff_aug
         self.ada = cfgs.ada
