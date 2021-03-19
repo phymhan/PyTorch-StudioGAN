@@ -88,6 +88,8 @@
       },
   
       "training_and_sampling_setting":{
+        "no_log_sn_dis": true,
+
         "random_flip_preprocessing": true,
         "diff_aug":false,
   

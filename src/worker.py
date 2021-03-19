@@ -92,6 +92,8 @@ class make_worker(object):
         self.d_spectral_norm = cfgs.d_spectral_norm
         self.g_spectral_norm = cfgs.g_spectral_norm
 
+        self.log_sn_dis = not cfgs.no_log_sn_dis
+
         self.G_optimizer = G_optimizer
         self.D_optimizer = D_optimizer
         self.batch_size = cfgs.batch_size
@@ -394,7 +396,7 @@ class make_worker(object):
                         p.data.clamp_(-self.weight_clipping_bound, self.weight_clipping_bound)
 
             if step_count % self.print_every == 0 and step_count !=0 and self.global_rank == 0:
-                if self.d_spectral_norm:
+                if self.d_spectral_norm and self.log_sn_dis:
                     dis_sigmas = calculate_all_sn(self.dis_model)
                     self.writer.add_scalars('SN_of_dis', dis_sigmas, step_count)
 
