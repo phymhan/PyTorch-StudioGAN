@@ -434,7 +434,6 @@ class Discriminator(nn.Module):
                 proj_p = torch.squeeze(self.linear_p(h))
                 proj_q = torch.squeeze(self.linear_q(h))
                 out_wx = torch.squeeze(self.linear_wx(h.detach()))
-                st()
                 authen_output = authen_output + proj_p[range(batch_size), label] - proj_q[range(batch_size), label]
                 return authen_output, proj_p, proj_q, out_wx
 

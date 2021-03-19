@@ -49,7 +49,6 @@ def loss_hinge_dis(dis_out_real, dis_out_fake, weight_real=None, weight_fake=Non
         loss_fake = torch.mean(F.relu(1. + dis_out_fake))
     else:
         loss_fake = torch.mean(weight_fake.reshape(dis_out_fake.shape) * F.relu(1. + dis_out_fake))
-    st()
     return loss_real + loss_fake
 
 

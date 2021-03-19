@@ -277,7 +277,6 @@ class make_worker(object):
                                     torch.mean(F.cross_entropy(proj_q_fake, fake_labels, reduction='none') * wx_fake.view(-1)))
                             else:
                                 dis_acml_loss += (self.ce_loss(proj_p_real, real_labels) + self.ce_loss(proj_q_fake, fake_labels))
-                            st()
                         elif self.conditional_strategy == "NT_Xent_GAN":
                             real_images_aug = CR_DiffAug(real_images)
                             _, cls_embed_real_aug, dis_out_real_aug = self.dis_model(real_images_aug, real_labels)
@@ -502,6 +501,9 @@ class make_worker(object):
                                                    'generator': gen_acml_loss.item()}, step_count)
                 if self.ada:
                     self.writer.add_scalar('ada_p', self.ada_aug_p, step_count)
+                
+                if self.conditional_strategy == "P2GAN" and self.weighted_loss:
+                    self.writer.add_scalar('lambda_mi', wx_real.mean().item(), step_count)
 
             if step_count % self.save_every == 0 or step_count == total_step:
                 if self.evaluate:
