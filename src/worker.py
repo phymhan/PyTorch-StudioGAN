@@ -92,7 +92,7 @@ class make_worker(object):
         self.d_spectral_norm = cfgs.d_spectral_norm
         self.g_spectral_norm = cfgs.g_spectral_norm
 
-        self.log_sn_dis = not cfgs.no_log_sn_dis
+        self.log_sn_dis = not getattr(cfgs, 'no_log_sn_dis', False)
 
         self.G_optimizer = G_optimizer
         self.D_optimizer = D_optimizer
@@ -126,8 +126,8 @@ class make_worker(object):
         self.dis_lambda = cfgs.dis_lambda
         self.sigma_noise = cfgs.sigma_noise
 
-        self.weighted_loss = cfgs.weighted_loss
-        self.weighted_loss_penalty = cfgs.weighted_loss_penalty
+        self.weighted_loss = getattr(cfgs, 'weighted_loss', False)
+        self.weighted_loss_penalty = getattr(cfgs, 'weighted_loss_penalty', False)
 
         self.diff_aug = cfgs.diff_aug
         self.ada = cfgs.ada
@@ -294,7 +294,7 @@ class make_worker(object):
                         
                         if self.weighted_loss and self.weighted_loss_penalty:
                             dis_acml_loss += (-torch.mean(torch.log(wx_fake * (1. - wx_fake) + 1e-8)) - 
-                                torch.mean(torch.log(wx_real * (1. - wx_real) + 1e-8)))
+                                torch.mean(torch.log(wx_real * (1. - wx_real) + 1e-8))) * 0.5
 
                         if self.cr:
                             real_images_aug = CR_DiffAug(real_images)
