@@ -128,7 +128,7 @@ class make_worker(object):
 
         self.weighted_loss = getattr(cfgs, 'weighted_loss', False)
         self.weighted_loss_penalty = getattr(cfgs, 'weighted_loss_penalty', False)
-        self.lambda_penalty_weight = getattr(cfgs, 'lambda_penalty_weight', 0.5)
+        self.lambda_penalty_weight = getattr(cfgs, 'lambda_penalty_weight', 1.0)
 
         self.diff_aug = cfgs.diff_aug
         self.ada = cfgs.ada
