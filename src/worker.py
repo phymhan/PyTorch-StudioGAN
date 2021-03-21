@@ -264,10 +264,18 @@ class make_worker(object):
                             # lambda_real = torch.sigmoid(logvar_w_real)
                             # lambda_fake = torch.sigmoid(logvar_w_fake)
                             # lambda_mi = torch.sigmoid(self.dis_model.scalar_w)
-                            lambda_real = torch.exp(-logvar_w_real)
-                            lambda_fake = torch.exp(-logvar_w_fake)
-                            logvar_w_mi = self.dis_model.scalar_w
-                            lambda_mi = torch.exp(-logvar_w_mi)
+                            if self.weighted_loss:
+                                if self.lambda_strategy == 'amortised':
+                                    lambda_real = torch.exp(-logvar_w_real)
+                                    lambda_fake = torch.exp(-logvar_w_fake)
+                                elif self.lambda_strategy == 'scalar':
+                                    if isinstance(self.dis_model, DataParallel) or isinstance(self.dis_model, DistributedDataParallel):
+                                        logvar_w_mi = self.dis_model.module.scalar_w
+                                    else:
+                                        logvar_w_mi = self.dis_model.scalar_w
+                                    lambda_mi = torch.exp(-logvar_w_mi)
+                                else:
+                                    raise NotImplementedError
                         elif self.conditional_strategy in ["NT_Xent_GAN", "Proxy_NCA_GAN", "ContraGAN"]:
                             cls_proxies_real, cls_embed_real, dis_out_real = self.dis_model(real_images, real_labels)
                             cls_proxies_fake, cls_embed_fake, dis_out_fake = self.dis_model(fake_images, fake_labels)
