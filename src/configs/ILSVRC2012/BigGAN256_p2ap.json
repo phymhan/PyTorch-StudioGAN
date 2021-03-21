@@ -71,7 +71,8 @@
 
         "weighted_loss": true,
         "weighted_loss_penalty": true,
-        "lambda_penalty_weight": 0.5,
+        "lambda_penalty_weight": 1.0,
+        "lambda_strategy": "amortised",
   
         "bcr": false,
         "real_lambda": "N/A",
