@@ -371,6 +371,7 @@ class Discriminator(nn.Module):
                 self.linear_p = snlinear(in_features=self.out_dims[-1], out_features=num_classes)
                 self.linear_q = snlinear(in_features=self.out_dims[-1], out_features=num_classes)
                 self.linear_w = linear(in_features=self.out_dims[-1], out_features=1)  # lambda, only supports linear for now
+                self.scalar_w = nn.Parameter(torch.tensor(0.))
             else:
                 pass
         else:
