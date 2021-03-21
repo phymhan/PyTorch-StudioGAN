@@ -259,35 +259,40 @@ class make_worker(object):
                             dis_out_real = self.dis_model(real_images, real_labels)
                             dis_out_fake = self.dis_model(fake_images, fake_labels)
                         elif self.conditional_strategy == "P2GAN":
-                            dis_out_real, proj_p_real, proj_q_real, out_w_real = self.dis_model(real_images, real_labels)
-                            dis_out_fake, proj_p_fake, proj_q_fake, out_w_fake = self.dis_model(fake_images, fake_labels)
-                            lam_real = torch.sigmoid(out_w_real)
-                            lam_fake = torch.sigmoid(out_w_fake)
-                            lam_mi = torch.sigmoid(self.dis_model.scalar_w)
+                            dis_out_real, proj_p_real, proj_q_real, logvar_w_real = self.dis_model(real_images, real_labels)
+                            dis_out_fake, proj_p_fake, proj_q_fake, logvar_w_fake = self.dis_model(fake_images, fake_labels)
+                            # lambda_real = torch.sigmoid(logvar_w_real)
+                            # lambda_fake = torch.sigmoid(logvar_w_fake)
+                            # lambda_mi = torch.sigmoid(self.dis_model.scalar_w)
+                            lambda_real = torch.exp(-logvar_w_real)
+                            lambda_fake = torch.exp(-logvar_w_fake)
+                            logvar_w_mi = self.dis_model.scalar_w
+                            lambda_mi = torch.exp(-logvar_w_mi)
                         elif self.conditional_strategy in ["NT_Xent_GAN", "Proxy_NCA_GAN", "ContraGAN"]:
                             cls_proxies_real, cls_embed_real, dis_out_real = self.dis_model(real_images, real_labels)
                             cls_proxies_fake, cls_embed_fake, dis_out_fake = self.dis_model(fake_images, fake_labels)
                         else:
                             raise NotImplementedError
 
-                        if self.weighted_loss:
-                            if self.lambda_strategy == 'amortised':
-                                dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake, 1.-lam_real, 1.-lam_fake)
-                            elif self.lambda_strategy == 'scalar':
-                                dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake) * (1.-lam_mi)
-                            else:
-                                raise NotImplementedError
-                        else:
-                            dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake)
+                        # if self.weighted_loss:
+                        #     if self.lambda_strategy == 'amortised':
+                        #         dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake, 1.-lambda_real, 1.-lambda_fake)
+                        #     elif self.lambda_strategy == 'scalar':
+                        #         dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake) * (1.-lambda_mi)
+                        #     else:
+                        #         raise NotImplementedError
+                        # else:
+                        #     dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake)
+                        dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake)
                         if self.conditional_strategy == "ACGAN":
                             dis_acml_loss += (self.ce_loss(cls_out_real, real_labels) + self.ce_loss(cls_out_fake, fake_labels))
                         elif self.conditional_strategy == "P2GAN":
                             if self.weighted_loss:
                                 if self.lambda_strategy == 'amortised':
-                                    dis_acml_loss += (torch.mean(F.cross_entropy(proj_p_real, real_labels, reduction='none') * lam_real.view(-1)) + 
-                                        torch.mean(F.cross_entropy(proj_q_fake, fake_labels, reduction='none') * lam_fake.view(-1)))
+                                    dis_acml_loss += (torch.mean(F.cross_entropy(proj_p_real, real_labels, reduction='none') * lambda_real.view(-1)) + 
+                                        torch.mean(F.cross_entropy(proj_q_fake, fake_labels, reduction='none') * lambda_fake.view(-1)))
                                 elif self.lambda_strategy == 'scalar':
-                                    dis_acml_loss += (self.ce_loss(proj_p_real, real_labels) + self.ce_loss(proj_q_fake, fake_labels)) * lam_mi
+                                    dis_acml_loss += (self.ce_loss(proj_p_real, real_labels) + self.ce_loss(proj_q_fake, fake_labels)) * lambda_mi
                             else:
                                 dis_acml_loss += (self.ce_loss(proj_p_real, real_labels) + self.ce_loss(proj_q_fake, fake_labels))
                         elif self.conditional_strategy == "NT_Xent_GAN":
@@ -305,10 +310,12 @@ class make_worker(object):
                         
                         if self.weighted_loss and self.weighted_loss_penalty:
                             if self.lambda_strategy == 'amortised':
-                                dis_acml_loss += (-torch.mean(torch.log(lam_fake * (1. - lam_fake) + 1e-8)) - 
-                                    torch.mean(torch.log(lam_real * (1. - lam_real) + 1e-8))) * self.lambda_penalty_weight
+                                # dis_acml_loss += (-torch.mean(torch.log(lambda_fake * (1. - lambda_fake) + 1e-8)) - 
+                                #     torch.mean(torch.log(lambda_real * (1. - lambda_real) + 1e-8))) * self.lambda_penalty_weight
+                                dis_acml_loss += (torch.mean(logvar_w_real) + torch.mean(logvar_w_fake)) * self.lambda_penalty_weight
                             elif self.lambda_strategy == 'scalar':
-                                dis_acml_loss += -(F.logsigmoid(lam_mi) + F.logsigmoid(-lam_mi)) * self.lambda_penalty_weight
+                                # dis_acml_loss += -(F.logsigmoid(lambda_mi) + F.logsigmoid(-lambda_mi)) * self.lambda_penalty_weight
+                                dis_acml_loss += logvar_w_mi * self.lambda_penalty_weight
 
                         if self.cr:
                             real_images_aug = CR_DiffAug(real_images)
@@ -443,21 +450,23 @@ class make_worker(object):
                         elif self.conditional_strategy == "ProjGAN" or self.conditional_strategy == "no":
                             dis_out_fake = self.dis_model(fake_images, fake_labels)
                         elif self.conditional_strategy == "P2GAN":
-                            dis_out_fake, proj_p_fake, proj_q_fake, out_w_fake = self.dis_model(fake_images, fake_labels)
-                            lam_fake = torch.sigmoid(out_w_fake.detach())
+                            dis_out_fake, proj_p_fake, proj_q_fake, logvar_w_fake = self.dis_model(fake_images, fake_labels)
+                            # lambda_fake = torch.sigmoid(logvar_w_fake.detach())
+                            # lambda_fake = torch.sigmoid(self.dis_model.scalar_w.detach())
                         elif self.conditional_strategy in ["NT_Xent_GAN", "Proxy_NCA_GAN", "ContraGAN"]:
                             fake_cls_mask = make_mask(fake_labels, self.num_classes, self.local_rank)
                             cls_proxies_fake, cls_embed_fake, dis_out_fake = self.dis_model(fake_images, fake_labels)
                         else:
                             raise NotImplementedError
 
-                        if self.weighted_loss:
-                            if self.lambda_strategy == 'amortised':
-                                gen_acml_loss = self.G_loss(dis_out_fake, 1.-lam_fake)
-                            elif self.lambda_strategy == 'scalar':
-                                gen_acml_loss = self.G_loss(dis_out_fake) * (1.-lam_mi)
-                        else:
-                            gen_acml_loss = self.G_loss(dis_out_fake)
+                        # if self.weighted_loss:
+                        #     if self.lambda_strategy == 'amortised':
+                        #         gen_acml_loss = self.G_loss(dis_out_fake, 1.-lambda_fake)
+                        #     elif self.lambda_strategy == 'scalar':
+                        #         gen_acml_loss = self.G_loss(dis_out_fake) * (1.-lambda_mi)
+                        # else:
+                        #     gen_acml_loss = self.G_loss(dis_out_fake)
+                        gen_acml_loss = self.G_loss(dis_out_fake)
 
                         if self.latent_op:
                             gen_acml_loss += transport_cost*self.latent_norm_reg_weight
@@ -523,9 +532,9 @@ class make_worker(object):
                 
                 if self.conditional_strategy == "P2GAN" and self.weighted_loss:
                     if self.lambda_strategy == 'amortised':
-                        self.writer.add_scalar('lambda_mi', lam_real.mean().item(), step_count)
+                        self.writer.add_scalar('lambda_mi', lambda_real.mean().item(), step_count)
                     elif self.lambda_strategy == 'scalar':
-                        self.writer.add_scalar('lambda_mi', lam_mi.item(), step_count)
+                        self.writer.add_scalar('lambda_mi', lambda_mi.item(), step_count)
 
             if step_count % self.save_every == 0 or step_count == total_step:
                 if self.evaluate:
