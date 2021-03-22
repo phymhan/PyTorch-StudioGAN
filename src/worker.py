@@ -299,9 +299,9 @@ class make_worker(object):
                             if self.weighted_loss:
                                 if self.lambda_strategy == 'amortised':
                                     dis_acml_loss += (torch.mean(F.cross_entropy(proj_p_real, real_labels, reduction='none') * lambda_real.view(-1)) + 
-                                        torch.mean(F.cross_entropy(proj_q_fake, fake_labels, reduction='none') * lambda_fake.view(-1)))
+                                        torch.mean(F.cross_entropy(proj_q_fake, fake_labels, reduction='none') * lambda_fake.view(-1))) * self.lambda_mi_weight
                                 elif self.lambda_strategy == 'scalar':
-                                    dis_acml_loss += (self.ce_loss(proj_p_real, real_labels) + self.ce_loss(proj_q_fake, fake_labels)) * lambda_mi
+                                    dis_acml_loss += (self.ce_loss(proj_p_real, real_labels) + self.ce_loss(proj_q_fake, fake_labels)) * lambda_mi * self.lambda_mi_weight
                             else:
                                 dis_acml_loss += (self.ce_loss(proj_p_real, real_labels) + self.ce_loss(proj_q_fake, fake_labels))
                         elif self.conditional_strategy == "NT_Xent_GAN":

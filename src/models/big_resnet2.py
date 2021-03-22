@@ -297,7 +297,7 @@ class DiscBlock(nn.Module):
 class Discriminator(nn.Module):
     """Discriminator."""
     def __init__(self, img_size, d_conv_dim, d_spectral_norm, attention, attention_after_nth_dis_block, activation_fn, conditional_strategy,
-                 hypersphere_dim, num_classes, nonlinear_embed, normalize_embed, initialize, D_depth, mixed_precision, weighted_loss=True):
+                 hypersphere_dim, num_classes, nonlinear_embed, normalize_embed, initialize, D_depth, mixed_precision):
         super(Discriminator, self).__init__()
         d_in_dims_collection = {"32": [3] + [d_conv_dim*2, d_conv_dim*2, d_conv_dim*2],
                                 "64": [3] + [d_conv_dim, d_conv_dim*2, d_conv_dim*4, d_conv_dim*8],
@@ -356,6 +356,7 @@ class Discriminator(nn.Module):
         else:
             raise NotImplementedError
 
+        proj_bias = True
         if d_spectral_norm:
             self.linear1 = snlinear(in_features=self.out_dims[-1], out_features=1)
             if self.conditional_strategy in ['ContraGAN', 'Proxy_NCA_GAN', 'NT_Xent_GAN']:
@@ -368,8 +369,8 @@ class Discriminator(nn.Module):
             elif self.conditional_strategy == 'ACGAN':
                 self.linear4 = snlinear(in_features=self.out_dims[-1], out_features=num_classes)
             elif self.conditional_strategy == 'P2GAN':
-                self.linear_p = snlinear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)  # no bias == embedding
-                self.linear_q = snlinear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)
+                self.linear_p = snlinear(in_features=self.out_dims[-1], out_features=num_classes, bias=proj_bias)  # no bias == embedding
+                self.linear_q = snlinear(in_features=self.out_dims[-1], out_features=num_classes, bias=proj_bias)
                 self.linear_w = linear(in_features=self.out_dims[-1], out_features=1)  # lambda, only supports linear for now
                 self.scalar_w = nn.Parameter(torch.tensor(0.))
             else:
@@ -386,8 +387,8 @@ class Discriminator(nn.Module):
             elif self.conditional_strategy == 'ACGAN':
                 self.linear4 = linear(in_features=self.out_dims[-1], out_features=num_classes)
             elif self.conditional_strategy == 'P2GAN':
-                self.linear_p = linear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)
-                self.linear_q = linear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)
+                self.linear_p = linear(in_features=self.out_dims[-1], out_features=num_classes, bias=proj_bias)
+                self.linear_q = linear(in_features=self.out_dims[-1], out_features=num_classes, bias=proj_bias)
                 self.linear_w = linear(in_features=self.out_dims[-1], out_features=1)  # lambda
                 self.scalar_w = nn.Parameter(torch.tensor(0.))
             else:
@@ -432,9 +433,8 @@ class Discriminator(nn.Module):
             
             elif self.conditional_strategy == 'P2GAN':
                 authen_output = torch.squeeze(self.linear1(h))
-                # proj = torch.sum(torch.mul(self.embedding(label), h), 1)
-                proj_p = torch.squeeze(self.linear_p(h))
-                proj_q = torch.squeeze(self.linear_q(h))
+                proj_p = self.linear_p(h)
+                proj_q = self.linear_q(h)
                 out_w = torch.squeeze(self.linear_w(h.detach()))
                 authen_output = authen_output + proj_p[range(batch_size), label] - proj_q[range(batch_size), label]
                 return authen_output, proj_p, proj_q, out_w
