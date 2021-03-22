@@ -368,8 +368,8 @@ class Discriminator(nn.Module):
             elif self.conditional_strategy == 'ACGAN':
                 self.linear4 = snlinear(in_features=self.out_dims[-1], out_features=num_classes)
             elif self.conditional_strategy == 'P2GAN':
-                self.linear_p = snlinear(in_features=self.out_dims[-1], out_features=num_classes)
-                self.linear_q = snlinear(in_features=self.out_dims[-1], out_features=num_classes)
+                self.linear_p = snlinear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)  # no bias == embedding
+                self.linear_q = snlinear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)
                 self.linear_w = linear(in_features=self.out_dims[-1], out_features=1)  # lambda, only supports linear for now
                 self.scalar_w = nn.Parameter(torch.tensor(0.))
             else:
@@ -386,9 +386,10 @@ class Discriminator(nn.Module):
             elif self.conditional_strategy == 'ACGAN':
                 self.linear4 = linear(in_features=self.out_dims[-1], out_features=num_classes)
             elif self.conditional_strategy == 'P2GAN':
-                self.linear_p = linear(in_features=self.out_dims[-1], out_features=num_classes)
-                self.linear_q = linear(in_features=self.out_dims[-1], out_features=num_classes)
+                self.linear_p = linear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)
+                self.linear_q = linear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)
                 self.linear_w = linear(in_features=self.out_dims[-1], out_features=1)  # lambda
+                self.scalar_w = nn.Parameter(torch.tensor(0.))
             else:
                 pass
 

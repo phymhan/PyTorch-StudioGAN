@@ -130,6 +130,7 @@ class make_worker(object):
         self.weighted_loss_penalty = getattr(cfgs, 'weighted_loss_penalty', False)
         self.lambda_penalty_weight = getattr(cfgs, 'lambda_penalty_weight', 1.0)
         self.lambda_strategy = getattr(cfgs, 'lambda_strategy', 'amortised')
+        self.lambda_mi_weight = getattr(cfgs, 'lambda_mi_weight', 1.0)
 
         self.diff_aug = cfgs.diff_aug
         self.ada = cfgs.ada
@@ -294,7 +295,7 @@ class make_worker(object):
                         dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake)
                         if self.conditional_strategy == "ACGAN":
                             dis_acml_loss += (self.ce_loss(cls_out_real, real_labels) + self.ce_loss(cls_out_fake, fake_labels))
-                        elif self.conditional_strategy == "P2GAN":
+                        elif self.conditional_strategy == "P2GAN" and self.lambda_mi_weight > 0:
                             if self.weighted_loss:
                                 if self.lambda_strategy == 'amortised':
                                     dis_acml_loss += (torch.mean(F.cross_entropy(proj_p_real, real_labels, reduction='none') * lambda_real.view(-1)) + 
@@ -322,7 +323,7 @@ class make_worker(object):
                                 #     torch.mean(torch.log(lambda_real * (1. - lambda_real) + 1e-8))) * self.lambda_penalty_weight
                                 dis_acml_loss += (torch.mean(logvar_w_real) + torch.mean(logvar_w_fake)) * self.lambda_penalty_weight
                             elif self.lambda_strategy == 'scalar':
-                                # dis_acml_loss += -(F.logsigmoid(lambda_mi) + F.logsigmoid(-lambda_mi)) * self.lambda_penalty_weight
+                                # dis_acml_loss += -(F.logsigmoid(logvar_w_mi) + F.logsigmoid(-logvar_w_mi)) * self.lambda_penalty_weight
                                 dis_acml_loss += logvar_w_mi * self.lambda_penalty_weight
 
                         if self.cr:
@@ -705,7 +706,7 @@ class make_worker(object):
                 if self.train:
                     self.logger.info('Best FID score (Step: {step}, Using {type} moments): {FID}'.format(step=self.best_step, type=self.eval_type, FID=self.best_fid))
 
-            self.run_image_visualization(nrow=self.cfgs.nrow, ncol=self.cfgs.ncol, standing_statistics=False, standing_step="N/A")
+            self.run_image_visualization(nrow=self.cfgs.nrow, ncol=self.cfgs.ncol, standing_statistics=False, standing_step="N/A", step_count=step)
 
             self.dis_model.train()
             generator = change_generator_mode(self.gen_model, self.Gen_copy, self.bn_stat_OnTheFly, standing_statistics, standing_step,
@@ -739,7 +740,7 @@ class make_worker(object):
 
 
     ################################################################################################################################
-    def run_image_visualization(self, nrow, ncol, standing_statistics, standing_step):
+    def run_image_visualization(self, nrow, ncol, standing_statistics, standing_step, step_count):
         if self.global_rank == 0: self.logger.info('Start visualize images....')
         if standing_statistics: self.counter += 1
         assert self.batch_size % 8 ==0, "batch size should be devided by 8!"
@@ -761,8 +762,8 @@ class make_worker(object):
 
             generated_images = generator(zs, fake_labels, evaluation=True)
 
-            plot_img_canvas((generated_images.detach().cpu()+1)/2, "./figures/{run_name}/generated_canvas.png".\
-                            format(run_name=self.run_name), ncol, self.logger, logging=True)
+            plot_img_canvas((generated_images.detach().cpu()+1)/2, "./figures/{run_name}/generated_canvas_step={step_count}.png".\
+                            format(run_name=self.run_name, step_count=step_count), ncol, self.logger, logging=True)
 
             generator = change_generator_mode(self.gen_model, self.Gen_copy, self.bn_stat_OnTheFly, standing_statistics, standing_step,
                                               self.prior, self.batch_size, self.z_dim, self.num_classes, self.local_rank, training=True, counter=self.counter)
