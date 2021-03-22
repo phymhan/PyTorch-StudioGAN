@@ -552,16 +552,16 @@ class make_worker(object):
                         self.writer.add_scalar('lambda_mi', lambda_mi.item(), step_count)
 
             if step_count % self.save_every == 0 or step_count == total_step:
-                if self.global_rank == 0:
-                    with torch.no_grad():
-                        torchvision.utils.save_image(real_images.detach().cpu(),
-                            f"./figures/{self.run_name}/real_images.png",
-                            nrow=int(self.batch_size**0.5), normalize=True, range=(-1,1))
                 if self.evaluate:
                     is_best = self.evaluation(step_count, False, "N/A")
                     if self.global_rank == 0: self.save(step_count, is_best)
                 else:
                     if self.global_rank == 0: self.save(step_count, False)
+                if self.global_rank == 0:
+                    with torch.no_grad():
+                        torchvision.utils.save_image(real_images.detach().cpu(),
+                            f"./figures/{self.run_name}/real_images.png",
+                            nrow=int(self.batch_size**0.5), normalize=True, range=(-1,1))
 
             if self.cfgs.distributed_data_parallel:
                 dist.barrier(self.group)
