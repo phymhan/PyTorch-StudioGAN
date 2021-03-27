@@ -82,13 +82,14 @@ def prepare_train_eval(local_rank, gpus_per_node, world_size, run_name, train_co
     if local_rank == 0: logger.info('Build model...')
     module = __import__('models.{architecture}'.format(architecture=cfgs.architecture), fromlist=['something'])
     if local_rank == 0: logger.info('Modules are located on models.{architecture}.'.format(architecture=cfgs.architecture))
+    dual_proj_type = getattr(cfgs, 'dual_proj_type', 'none')
     Gen = module.Generator(cfgs.z_dim, cfgs.shared_dim, cfgs.img_size, cfgs.g_conv_dim, cfgs.g_spectral_norm, cfgs.attention,
                            cfgs.attention_after_nth_gen_block, cfgs.activation_fn, cfgs.conditional_strategy, cfgs.num_classes,
                            cfgs.g_init, cfgs.G_depth, cfgs.mixed_precision).to(local_rank)
 
     Dis = module.Discriminator(cfgs.img_size, cfgs.d_conv_dim, cfgs.d_spectral_norm, cfgs.attention, cfgs.attention_after_nth_dis_block,
                                cfgs.activation_fn, cfgs.conditional_strategy, cfgs.hypersphere_dim, cfgs.num_classes, cfgs.nonlinear_embed,
-                               cfgs.normalize_embed, cfgs.d_init, cfgs.D_depth, cfgs.mixed_precision).to(local_rank)
+                               cfgs.normalize_embed, cfgs.d_init, cfgs.D_depth, cfgs.mixed_precision, dual_proj_type).to(local_rank)
 
     if cfgs.ema:
         if local_rank == 0: logger.info('Prepare EMA for G with decay of {}.'.format(cfgs.ema_decay))

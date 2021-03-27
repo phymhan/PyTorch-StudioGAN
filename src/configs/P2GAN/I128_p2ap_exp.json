@@ -13,7 +13,7 @@
       "model": {
         "architecture": "big_resnet2",
         "conditional_strategy": "P2GAN",
-        "dual_proj_type": "sp-sigmoid",
+        "dual_proj_type": "ap-exp",
         "pos_collected_numerator":false,
         "hypersphere_dim": "N/A",
         "nonlinear_embed": false,

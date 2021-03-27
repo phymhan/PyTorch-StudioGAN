@@ -297,7 +297,7 @@ class DiscBlock(nn.Module):
 class Discriminator(nn.Module):
     """Discriminator."""
     def __init__(self, img_size, d_conv_dim, d_spectral_norm, attention, attention_after_nth_dis_block, activation_fn, conditional_strategy,
-                 hypersphere_dim, num_classes, nonlinear_embed, normalize_embed, initialize, D_depth, mixed_precision):
+                 hypersphere_dim, num_classes, nonlinear_embed, normalize_embed, initialize, D_depth, mixed_precision, dual_proj_type='ap-exp'):
         super(Discriminator, self).__init__()
         d_in_dims_collection = {"32": [3] + [d_conv_dim*2, d_conv_dim*2, d_conv_dim*2],
                                 "64": [3] + [d_conv_dim, d_conv_dim*2, d_conv_dim*4, d_conv_dim*8],
@@ -321,6 +321,8 @@ class Discriminator(nn.Module):
         self.normalize_embed = normalize_embed
         self.conditional_strategy = conditional_strategy
         self.mixed_precision = mixed_precision
+        self.dual_proj_type = dual_proj_type
+        assert(dual_proj_type in ['none', 'p2', 'a-exp', 'ap-exp', 's-exp', 'sp-exp', 'a-sigmoid', 'ap-sigmoid', 's-sigmoid', 'sp-sigmoid'])
 
         self.in_dims  = d_in_dims_collection[str(img_size)]
         self.out_dims = d_out_dims_collection[str(img_size)]
@@ -357,6 +359,7 @@ class Discriminator(nn.Module):
             raise NotImplementedError
 
         proj_bias = True
+        self.linear_w = self.scalar_w = None
         if d_spectral_norm:
             self.linear1 = snlinear(in_features=self.out_dims[-1], out_features=1)
             if self.conditional_strategy in ['ContraGAN', 'Proxy_NCA_GAN', 'NT_Xent_GAN']:
@@ -371,8 +374,12 @@ class Discriminator(nn.Module):
             elif self.conditional_strategy == 'P2GAN':
                 self.linear_p = snlinear(in_features=self.out_dims[-1], out_features=num_classes, bias=proj_bias)  # no bias == embedding
                 self.linear_q = snlinear(in_features=self.out_dims[-1], out_features=num_classes, bias=proj_bias)
-                self.linear_w = linear(in_features=self.out_dims[-1], out_features=1)  # lambda, only supports linear for now
-                self.scalar_w = nn.Parameter(torch.tensor(0.))
+                if self.dual_proj_type in ['a-sigmoid', 'ap-sigmoid', 'a-exp', 'ap-exp']:
+                    self.linear_w = linear(in_features=self.out_dims[-1], out_features=1)  # lambda, only supports linear for now
+                elif self.dual_proj_type in ['s-sigmoid', 'sp-sigmoid', 's-exp', 'sp-exp']:
+                    self.scalar_w = nn.Parameter(torch.tensor(0.))
+                    self.scalar_p = nn.Parameter(torch.tensor(0.))
+                    self.scalar_q = nn.Parameter(torch.tensor(0.))
             else:
                 pass
         else:
@@ -389,8 +396,12 @@ class Discriminator(nn.Module):
             elif self.conditional_strategy == 'P2GAN':
                 self.linear_p = linear(in_features=self.out_dims[-1], out_features=num_classes, bias=proj_bias)
                 self.linear_q = linear(in_features=self.out_dims[-1], out_features=num_classes, bias=proj_bias)
-                self.linear_w = linear(in_features=self.out_dims[-1], out_features=1)  # lambda
-                self.scalar_w = nn.Parameter(torch.tensor(0.))
+                if self.dual_proj_type in ['a-sigmoid', 'ap-sigmoid', 'a-exp', 'ap-exp']:
+                    self.linear_w = linear(in_features=self.out_dims[-1], out_features=1)  # lambda
+                elif self.dual_proj_type in ['s-sigmoid', 'sp-sigmoid', 's-exp', 'sp-exp']:
+                    self.scalar_w = nn.Parameter(torch.tensor(0.))
+                    self.scalar_p = nn.Parameter(torch.tensor(0.))
+                    self.scalar_q = nn.Parameter(torch.tensor(0.))
             else:
                 pass
 
@@ -435,9 +446,13 @@ class Discriminator(nn.Module):
                 authen_output = torch.squeeze(self.linear1(h))
                 proj_p = self.linear_p(h)
                 proj_q = self.linear_q(h)
-                out_w = torch.squeeze(self.linear_w(h.detach()))
+                logvar_w = None
+                if self.dual_proj_type in ['a-sigmoid', 'ap-sigmoid', 'a-exp', 'ap-exp']:
+                    logvar_w = torch.squeeze(self.linear_w(h.detach()))
+                elif self.dual_proj_type in ['s-sigmoid', 'sp-sigmoid', 's-exp', 'sp-exp']:
+                    logvar_w = self.scalar_w
                 authen_output = authen_output + proj_p[range(batch_size), label] - proj_q[range(batch_size), label]
-                return authen_output, proj_p, proj_q, out_w
+                return authen_output, proj_p, proj_q, logvar_w
 
             elif self.conditional_strategy == 'ACGAN':
                 authen_output = torch.squeeze(self.linear1(h))

@@ -13,6 +13,7 @@
       "model": {
         "architecture": "big_resnet2",
         "conditional_strategy": "P2GAN",
+        "dual_proj_type": "p2",
         "pos_collected_numerator":false,
         "hypersphere_dim": "N/A",
         "nonlinear_embed": false,
@@ -69,10 +70,8 @@
         "cr": false,
         "cr_lambda":"N/A",
 
-        "weighted_loss": false,
-        "weighted_loss_penalty": false,
-        "lambda_penalty_weight": 0,
         "lambda_mi_weight": 1.0,
+        "lambda_penalty_weight": 0,
   
         "bcr": false,
         "real_lambda": "N/A",

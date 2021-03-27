@@ -126,11 +126,9 @@ class make_worker(object):
         self.dis_lambda = cfgs.dis_lambda
         self.sigma_noise = cfgs.sigma_noise
 
-        self.weighted_loss = getattr(cfgs, 'weighted_loss', False)
-        self.weighted_loss_penalty = getattr(cfgs, 'weighted_loss_penalty', False)
-        self.lambda_penalty_weight = getattr(cfgs, 'lambda_penalty_weight', 1.0)
-        self.lambda_strategy = getattr(cfgs, 'lambda_strategy', 'amortised')
+        self.dual_proj_type = getattr(cfgs, 'dual_proj_type', 'none')
         self.lambda_mi_weight = getattr(cfgs, 'lambda_mi_weight', 1.0)
+        self.lambda_penalty_weight = getattr(cfgs, 'lambda_penalty_weight', 1.0)
 
         self.diff_aug = cfgs.diff_aug
         self.ada = cfgs.ada
@@ -214,6 +212,8 @@ class make_worker(object):
         step_count = current_step
         train_iter = iter(self.train_dataloader)
 
+        lambda_real = lambda_fake = torch.tensor(0.0)
+
         self.ada_aug_p = self.adtv_aug.initialize() if self.ada else 'No'
         while step_count <= total_step:
             # ================== TRAIN D ================== #
@@ -260,50 +260,33 @@ class make_worker(object):
                             dis_out_real = self.dis_model(real_images, real_labels)
                             dis_out_fake = self.dis_model(fake_images, fake_labels)
                         elif self.conditional_strategy == "P2GAN":
-                            dis_out_real, proj_p_real, proj_q_real, logvar_w_real = self.dis_model(real_images, real_labels)
-                            dis_out_fake, proj_p_fake, proj_q_fake, logvar_w_fake = self.dis_model(fake_images, fake_labels)
-                            # lambda_real = torch.sigmoid(logvar_w_real)
-                            # lambda_fake = torch.sigmoid(logvar_w_fake)
-                            # lambda_mi = torch.sigmoid(self.dis_model.scalar_w)
-                            if self.weighted_loss:
-                                if self.lambda_strategy == 'amortised':
-                                    lambda_real = torch.exp(-logvar_w_real)
-                                    lambda_fake = torch.exp(-logvar_w_fake)
-                                elif self.lambda_strategy == 'scalar':
-                                    if isinstance(self.dis_model, DataParallel) or isinstance(self.dis_model, DistributedDataParallel):
-                                        logvar_w_mi = self.dis_model.module.scalar_w
-                                    else:
-                                        logvar_w_mi = self.dis_model.scalar_w
-                                    lambda_mi = torch.exp(-logvar_w_mi)
-                                else:
-                                    raise NotImplementedError
+                            dis_out_real, proj_p_real, _, logvar_w_real = self.dis_model(real_images, real_labels)
+                            dis_out_fake, _, proj_q_fake, logvar_w_fake = self.dis_model(fake_images, fake_labels)
+                            if self.dual_proj_type in ['a-sigmoid', 'ap-sigmoid', 's-sigmoid', 'sp-sigmoid']:
+                                lambda_real = torch.sigmoid(logvar_w_real)
+                                lambda_fake = torch.sigmoid(logvar_w_fake)
+                            elif self.dual_proj_type in ['a-exp', 'ap-exp', 's-exp', 'sp-exp']:
+                                lambda_real = torch.exp(-logvar_w_real)
+                                lambda_fake = torch.exp(-logvar_w_fake)
                         elif self.conditional_strategy in ["NT_Xent_GAN", "Proxy_NCA_GAN", "ContraGAN"]:
                             cls_proxies_real, cls_embed_real, dis_out_real = self.dis_model(real_images, real_labels)
                             cls_proxies_fake, cls_embed_fake, dis_out_fake = self.dis_model(fake_images, fake_labels)
                         else:
                             raise NotImplementedError
 
-                        # if self.weighted_loss:
-                        #     if self.lambda_strategy == 'amortised':
-                        #         dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake, 1.-lambda_real, 1.-lambda_fake)
-                        #     elif self.lambda_strategy == 'scalar':
-                        #         dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake) * (1.-lambda_mi)
-                        #     else:
-                        #         raise NotImplementedError
-                        # else:
-                        #     dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake)
-                        dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake)
+                        if (self.conditional_strategy == "P2GAN") and (self.dual_proj_type in ['a-sigmoid', 'ap-sigmoid', 's-sigmoid', 'sp-sigmoid']):
+                            assert(not lambda_real.shape or dis_out_real.shape == lambda_real.shape)
+                            dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake, 1.-lambda_real, 1.-lambda_fake)
+                        else:
+                            dis_acml_loss = self.D_loss(dis_out_real, dis_out_fake)
                         if self.conditional_strategy == "ACGAN":
                             dis_acml_loss += (self.ce_loss(cls_out_real, real_labels) + self.ce_loss(cls_out_fake, fake_labels))
                         elif self.conditional_strategy == "P2GAN" and self.lambda_mi_weight > 0:
-                            if self.weighted_loss:
-                                if self.lambda_strategy == 'amortised':
-                                    dis_acml_loss += (torch.mean(F.cross_entropy(proj_p_real, real_labels, reduction='none') * lambda_real.view(-1)) + 
-                                        torch.mean(F.cross_entropy(proj_q_fake, fake_labels, reduction='none') * lambda_fake.view(-1))) * self.lambda_mi_weight
-                                elif self.lambda_strategy == 'scalar':
-                                    dis_acml_loss += (self.ce_loss(proj_p_real, real_labels) + self.ce_loss(proj_q_fake, fake_labels)) * lambda_mi * self.lambda_mi_weight
-                            else:
+                            if self.dual_proj_type in ['none', 'p2']:
                                 dis_acml_loss += (self.ce_loss(proj_p_real, real_labels) + self.ce_loss(proj_q_fake, fake_labels))
+                            else:
+                                dis_acml_loss += (torch.mean(F.cross_entropy(proj_p_real, real_labels, reduction='none') * lambda_real) + 
+                                    torch.mean(F.cross_entropy(proj_q_fake, fake_labels, reduction='none') * lambda_fake)) * self.lambda_mi_weight
                         elif self.conditional_strategy == "NT_Xent_GAN":
                             real_images_aug = CR_DiffAug(real_images)
                             _, cls_embed_real_aug, dis_out_real_aug = self.dis_model(real_images_aug, real_labels)
@@ -316,15 +299,12 @@ class make_worker(object):
                                                                                                 real_cls_mask, real_labels, t, self.margin)
                         else:
                             pass
-                        
-                        if self.weighted_loss and self.weighted_loss_penalty:
-                            if self.lambda_strategy == 'amortised':
-                                # dis_acml_loss += (-torch.mean(torch.log(lambda_fake * (1. - lambda_fake) + 1e-8)) - 
-                                #     torch.mean(torch.log(lambda_real * (1. - lambda_real) + 1e-8))) * self.lambda_penalty_weight
-                                dis_acml_loss += (torch.mean(logvar_w_real) + torch.mean(logvar_w_fake)) * self.lambda_penalty_weight
-                            elif self.lambda_strategy == 'scalar':
-                                # dis_acml_loss += -(F.logsigmoid(logvar_w_mi) + F.logsigmoid(-logvar_w_mi)) * self.lambda_penalty_weight
-                                dis_acml_loss += logvar_w_mi * self.lambda_penalty_weight
+
+                        if (self.conditional_strategy == "P2GAN") and (self.dual_proj_type in ['ap-exp', 'sp-exp']):
+                            dis_acml_loss += (torch.mean(logvar_w_real) + torch.mean(logvar_w_fake)) * self.lambda_penalty_weight
+                        elif (self.conditional_strategy == "P2GAN") and (self.dual_proj_type in ['ap-sigmoid', 'sp-sigmoid']):
+                            dis_acml_loss += -(F.logsigmoid(logvar_w_real) + F.logsigmoid(-logvar_w_real) + 
+                                F.logsigmoid(logvar_w_fake) + F.logsigmoid(-logvar_w_fake)) * self.lambda_penalty_weight
 
                         if self.cr:
                             real_images_aug = CR_DiffAug(real_images)
@@ -419,9 +399,8 @@ class make_worker(object):
                     self.scaler.step(self.D_optimizer)
                     self.scaler.update()
                 else:
-                    if self.weighted_loss and self.lambda_strategy == 'scalar':
-                        if (isinstance(self.dis_model, DataParallel) or
-                                isinstance(self.dis_model, DistributedDataParallel)):
+                    if (self.conditional_strategy == "P2GAN") and (self.dual_proj_type in ['s-sigmoid', 'sp-sigmoid', 's-exp', 'sp-exp']):
+                        if isinstance(self.dis_model, DataParallel) or isinstance(self.dis_model, DistributedDataParallel):
                             self.dis_model.module.scalar_w.grad *= 0.01
                         else:
                             self.dis_model.scalar_w.grad *= 0.01
@@ -466,22 +445,20 @@ class make_worker(object):
                             dis_out_fake = self.dis_model(fake_images, fake_labels)
                         elif self.conditional_strategy == "P2GAN":
                             dis_out_fake, proj_p_fake, proj_q_fake, logvar_w_fake = self.dis_model(fake_images, fake_labels)
-                            # lambda_fake = torch.sigmoid(logvar_w_fake.detach())
-                            # lambda_fake = torch.sigmoid(self.dis_model.scalar_w.detach())
+                            if self.dual_proj_type in ['a-sigmoid', 'ap-sigmoid', 's-sigmoid', 'sp-sigmoid']:
+                                lambda_fake = torch.sigmoid(logvar_w_fake)
+                            elif self.dual_proj_type in ['a-exp', 'ap-exp', 's-exp', 'sp-exp']:
+                                lambda_fake = torch.exp(-logvar_w_fake)
                         elif self.conditional_strategy in ["NT_Xent_GAN", "Proxy_NCA_GAN", "ContraGAN"]:
                             fake_cls_mask = make_mask(fake_labels, self.num_classes, self.local_rank)
                             cls_proxies_fake, cls_embed_fake, dis_out_fake = self.dis_model(fake_images, fake_labels)
                         else:
                             raise NotImplementedError
 
-                        # if self.weighted_loss:
-                        #     if self.lambda_strategy == 'amortised':
-                        #         gen_acml_loss = self.G_loss(dis_out_fake, 1.-lambda_fake)
-                        #     elif self.lambda_strategy == 'scalar':
-                        #         gen_acml_loss = self.G_loss(dis_out_fake) * (1.-lambda_mi)
-                        # else:
-                        #     gen_acml_loss = self.G_loss(dis_out_fake)
-                        gen_acml_loss = self.G_loss(dis_out_fake)
+                        if (self.conditional_strategy == "P2GAN") and (self.dual_proj_type in ['a-sigmoid', 'ap-sigmoid', 's-sigmoid', 'sp-sigmoid']):
+                            gen_acml_loss = self.G_loss(dis_out_fake, (1.-lambda_fake).detach())
+                        else:
+                            gen_acml_loss = self.G_loss(dis_out_fake)
 
                         if self.latent_op:
                             gen_acml_loss += transport_cost*self.latent_norm_reg_weight
@@ -545,11 +522,9 @@ class make_worker(object):
                 if self.ada:
                     self.writer.add_scalar('ada_p', self.ada_aug_p, step_count)
                 
-                if self.conditional_strategy == "P2GAN" and self.weighted_loss:
-                    if self.lambda_strategy == 'amortised':
-                        self.writer.add_scalar('lambda_mi', lambda_real.mean().item(), step_count)
-                    elif self.lambda_strategy == 'scalar':
-                        self.writer.add_scalar('lambda_mi', lambda_mi.item(), step_count)
+                if (self.conditional_strategy == "P2GAN") and (self.dual_proj_type not in ['none', 'p2']):
+                    self.writer.add_scalars('lambda_mi', {'real': lambda_real.mean().item(),
+                                                          'fake': lambda_fake.mean().item()}, step_count)
 
             if step_count % self.save_every == 0 or step_count == total_step:
                 if self.evaluate:
@@ -751,7 +726,7 @@ class make_worker(object):
 
 
     ################################################################################################################################
-    def run_image_visualization(self, nrow, ncol, standing_statistics, standing_step, step_count):
+    def run_image_visualization(self, nrow, ncol, standing_statistics, standing_step, step_count=None):
         if self.global_rank == 0: self.logger.info('Start visualize images....')
         if standing_statistics: self.counter += 1
         assert self.batch_size % 8 ==0, "batch size should be devided by 8!"
@@ -773,8 +748,12 @@ class make_worker(object):
 
             generated_images = generator(zs, fake_labels, evaluation=True)
 
-            plot_img_canvas((generated_images.detach().cpu()+1)/2, "./figures/{run_name}/generated_canvas_step={step_count}.png".\
-                            format(run_name=self.run_name, step_count=step_count), ncol, self.logger, logging=True)
+            if step_count is None:
+                plot_img_canvas((generated_images.detach().cpu()+1)/2, "./figures/{run_name}/generated_canvas.png".\
+                                format(run_name=self.run_name), ncol, self.logger, logging=True)
+            else:
+                plot_img_canvas((generated_images.detach().cpu()+1)/2, "./figures/{run_name}/generated_canvas_step={step_count}.png".\
+                                format(run_name=self.run_name, step_count=step_count), ncol, self.logger, logging=True)
 
             generator = change_generator_mode(self.gen_model, self.Gen_copy, self.bn_stat_OnTheFly, standing_statistics, standing_step,
                                               self.prior, self.batch_size, self.z_dim, self.num_classes, self.local_rank, training=True, counter=self.counter)

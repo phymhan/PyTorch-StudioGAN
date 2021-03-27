@@ -40,25 +40,23 @@ def loss_lsgan_gen(dis_out_fake):
     return gen_loss.mean()
 
 
-# def loss_hinge_dis(dis_out_real, dis_out_fake, weight_real=None, weight_fake=None):
-#     if weight_real is None:
-#         loss_real = torch.mean(F.relu(1. - dis_out_real))
-#     else:
-#         loss_real = torch.mean(weight_real.reshape(dis_out_real.shape) * F.relu(1. - dis_out_real))
-#     if weight_fake is None:
-#         loss_fake = torch.mean(F.relu(1. + dis_out_fake))
-#     else:
-#         loss_fake = torch.mean(weight_fake.reshape(dis_out_fake.shape) * F.relu(1. + dis_out_fake))
-#     return loss_real + loss_fake
-def loss_hinge_dis(dis_out_real, dis_out_fake):
-    return torch.mean(F.relu(1. - dis_out_real)) + torch.mean(F.relu(1. + dis_out_fake))
+def loss_hinge_dis(dis_out_real, dis_out_fake, weight_real=None, weight_fake=None):
+    if weight_real is None:
+        loss_real = torch.mean(F.relu(1. - dis_out_real))
+    else:
+        loss_real = torch.mean(weight_real * F.relu(1. - dis_out_real))
+    if weight_fake is None:
+        loss_fake = torch.mean(F.relu(1. + dis_out_fake))
+    else:
+        loss_fake = torch.mean(weight_fake * F.relu(1. + dis_out_fake))
+    return loss_real + loss_fake
 
 
 def loss_hinge_gen(gen_out_fake, weight_fake=None):
     if weight_fake is None:
         return -torch.mean(gen_out_fake)
     else:
-        return -torch.mean(gen_out_fake * weight_fake.reshape(gen_out_fake.shape))
+        return -torch.mean(gen_out_fake * weight_fake)
 
 
 def loss_wgan_dis(dis_out_real, dis_out_fake):
