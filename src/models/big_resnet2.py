@@ -359,7 +359,7 @@ class Discriminator(nn.Module):
             raise NotImplementedError
 
         proj_bias = True
-        self.linear_w = self.scalar_w = None
+        self.linear_w = self.scalar_w = self.scalar_p = self.scalar_q = None
         if d_spectral_norm:
             self.linear1 = snlinear(in_features=self.out_dims[-1], out_features=1)
             if self.conditional_strategy in ['ContraGAN', 'Proxy_NCA_GAN', 'NT_Xent_GAN']:

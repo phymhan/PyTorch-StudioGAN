@@ -303,8 +303,8 @@ class make_worker(object):
                         if (self.conditional_strategy == "P2GAN") and (self.dual_proj_type in ['ap-exp', 'sp-exp']):
                             dis_acml_loss += (torch.mean(logvar_w_real) + torch.mean(logvar_w_fake)) * self.lambda_penalty_weight
                         elif (self.conditional_strategy == "P2GAN") and (self.dual_proj_type in ['ap-sigmoid', 'sp-sigmoid']):
-                            dis_acml_loss += -(F.logsigmoid(logvar_w_real) + F.logsigmoid(-logvar_w_real) + 
-                                F.logsigmoid(logvar_w_fake) + F.logsigmoid(-logvar_w_fake)) * self.lambda_penalty_weight
+                            dis_acml_loss += -(torch.mean(F.logsigmoid(logvar_w_real) + F.logsigmoid(-logvar_w_real)) + 
+                                torch.mean(F.logsigmoid(logvar_w_fake) + F.logsigmoid(-logvar_w_fake))) * self.lambda_penalty_weight
 
                         if self.cr:
                             real_images_aug = CR_DiffAug(real_images)

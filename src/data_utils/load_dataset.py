@@ -71,8 +71,8 @@ class LoadDataset(Dataset):
                 self.transforms = []
             elif self.dataset_name in ['imagenet', 'custom']:
                 if train:
-                    # self.transforms = [RandomCropLongEdge(), transforms.Resize(self.resize_size)]
-                    self.transforms = [transforms.Resize(self.resize_size), transforms.CenterCrop(self.resize_size)]
+                    self.transforms = [RandomCropLongEdge(), transforms.Resize(self.resize_size)]
+                    # self.transforms = [transforms.Resize(self.resize_size), transforms.CenterCrop(self.resize_size)]
                 else:
                     self.transforms = [CenterCropLongEdge(), transforms.Resize(self.resize_size)]
         else:
