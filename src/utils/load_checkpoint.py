@@ -10,22 +10,26 @@ import os
 import torch
 
 
-def check_state_dict(model, checkpoint):
-    return set(model.state_dict.keys()) <= set(checkpoint['state_dict'].keys())
+def check_model_state_dict(model, checkpoint):
+    return set(model.state_dict().keys()) <= set(checkpoint['state_dict'].keys())
 
 
 def load_checkpoint(model, optimizer, filename, metric=False, ema=False):
     start_step = 0
     if ema:
         checkpoint = torch.load(filename)
-        model.load_state_dict(checkpoint['state_dict'], strict=not check_state_dict(model, checkpoint))
+        has_extra_keys = set(model.state_dict().keys()) < set(checkpoint['state_dict'].keys())
+        model.load_state_dict(checkpoint['state_dict'], strict=not has_extra_keys)
         return model
     else:
         checkpoint = torch.load(filename)
         seed = checkpoint['seed']
         run_name = checkpoint['run_name']
         start_step = checkpoint['step']
-        model.load_state_dict(checkpoint['state_dict'], strict=not check_state_dict(model, checkpoint))
+        has_extra_keys = set(model.state_dict().keys()) < set(checkpoint['state_dict'].keys())
+        model.load_state_dict(checkpoint['state_dict'], strict=not has_extra_keys)
+        if has_extra_keys:
+            checkpoint['optimizer']['param_groups'] = optimizer.state_dict()['param_groups']
         optimizer.load_state_dict(checkpoint['optimizer'])
         ada_p = checkpoint['ada_p']
         for state in optimizer.state.values():
