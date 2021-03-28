@@ -180,11 +180,12 @@ class make_worker(object):
                 self.embedding_layer = self.dis_model.embedding
         if self.conditional_strategy == 'P2GAN':
             if isinstance(self.dis_model, DataParallel) or isinstance(self.dis_model, DistributedDataParallel):
-                weight = self.dis_model.module.linear_p.weight
+                weight = self.dis_model.module.linear_p.weight.data
             else:
-                weight = self.dis_model.linear_p.weight
-            self.embedding_layer = nn.Embedding(weight.shape[1], weight.shape[0]).to(weight.device)
-            self.embedding_layer.weight = weight
+                weight = self.dis_model.linear_p.weight.data
+            self.embedding_layer = nn.Embedding(weight.shape[0], weight.shape[1])
+            self.embedding_layer.weight.data = weight
+            self.embedding_layer.to(self.local_rank)
 
         if self.conditional_strategy == 'ContraGAN':
             self.contrastive_criterion = Conditional_Contrastive_loss(self.local_rank, self.batch_size, self.pos_collected_numerator)
