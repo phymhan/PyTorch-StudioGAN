@@ -178,6 +178,13 @@ class make_worker(object):
                 self.embedding_layer = self.dis_model.module.embedding
             else:
                 self.embedding_layer = self.dis_model.embedding
+        if self.conditional_strategy == 'P2GAN':
+            if isinstance(self.dis_model, DataParallel) or isinstance(self.dis_model, DistributedDataParallel):
+                weight = self.dis_model.module.linear_p.weight
+            else:
+                weight = self.dis_model.linear_p.weight
+            self.embedding_layer = nn.Embedding(weight.shape[1], weight.shape[0]).to(weight.device)
+            self.embedding_layer.weight = weight
 
         if self.conditional_strategy == 'ContraGAN':
             self.contrastive_criterion = Conditional_Contrastive_loss(self.local_rank, self.batch_size, self.pos_collected_numerator)
@@ -642,7 +649,7 @@ class make_worker(object):
                                                                            self.latent_op_step4eval, self.latent_op_alpha, self.latent_op_beta, self.local_rank, self.logger)
             PR_Curve = plot_pr_curve(precision, recall, self.run_name, self.logger, logging=True)
 
-            if self.conditional_strategy in ['ProjGAN', 'ContraGAN', 'Proxy_NCA_GAN']:
+            if self.conditional_strategy in ['ProjGAN', 'P2GAN', 'ContraGAN', 'Proxy_NCA_GAN']:
                 if self.dataset_name == "cifar10":
                     classes = torch.tensor([c for c in range(self.num_classes)], dtype=torch.long).to(self.local_rank)
                     labels = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]

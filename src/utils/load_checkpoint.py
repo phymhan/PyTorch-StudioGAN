@@ -10,19 +10,22 @@ import os
 import torch
 
 
+def check_state_dict(model, checkpoint):
+    return set(model.state_dict.keys()) <= set(checkpoint['state_dict'].keys())
+
 
 def load_checkpoint(model, optimizer, filename, metric=False, ema=False):
     start_step = 0
     if ema:
         checkpoint = torch.load(filename)
-        model.load_state_dict(checkpoint['state_dict'])
+        model.load_state_dict(checkpoint['state_dict'], strict=not check_state_dict(model, checkpoint))
         return model
     else:
         checkpoint = torch.load(filename)
         seed = checkpoint['seed']
         run_name = checkpoint['run_name']
         start_step = checkpoint['step']
-        model.load_state_dict(checkpoint['state_dict'])
+        model.load_state_dict(checkpoint['state_dict'], strict=not check_state_dict(model, checkpoint))
         optimizer.load_state_dict(checkpoint['optimizer'])
         ada_p = checkpoint['ada_p']
         for state in optimizer.state.values():
