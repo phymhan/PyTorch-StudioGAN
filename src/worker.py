@@ -202,6 +202,8 @@ class make_worker(object):
             self.num_eval = {'train':50000, 'valid':10000}
         elif self.dataset_name == "cifar10":
             self.num_eval = {'train':50000, 'test':10000}
+        elif self.dataset_name == "food101":
+            self.num_eval = {'train':50000, 'valid':10000}
         elif self.dataset_name == "custom":
             num_train_images, num_eval_images = len(self.train_dataset.data), len(self.eval_dataset.data)
             self.num_eval = {'train':num_train_images, 'valid':num_eval_images}

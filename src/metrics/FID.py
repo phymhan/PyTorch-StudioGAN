@@ -81,6 +81,7 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
     tr_covmean = np.trace(covmean)
     return (diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean)
 
+
 def generate_images(batch_size, gen, dis, truncated_factor, prior, latent_op, latent_op_step,
                     latent_op_alpha, latent_op_beta, device):
     if isinstance(gen, DataParallel) or isinstance(gen, DistributedDataParallel):

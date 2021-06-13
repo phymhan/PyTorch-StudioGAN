@@ -69,7 +69,7 @@ class LoadDataset(Dataset):
         if self.hdf5_path is None:
             if self.dataset_name in ['cifar10', 'tiny_imagenet']:
                 self.transforms = []
-            elif self.dataset_name in ['imagenet', 'custom']:
+            elif self.dataset_name in ['imagenet', 'custom', 'food101']:
                 if train:
                     self.transforms = [RandomCropLongEdge(), transforms.Resize(self.resize_size)]
                     # self.transforms = [transforms.Resize(self.resize_size), transforms.CenterCrop(self.resize_size)]
@@ -128,8 +128,21 @@ class LoadDataset(Dataset):
                     self.data = f['imgs'][:]
                     self.labels = f['labels'][:]
             else:
-                mode = 'train' if self.train == True else 'valid'
-                root = os.path.join('data','CUSTOM', mode)
+                # mode = 'train' if self.train == True else 'valid'
+                # root = os.path.join('data','CUSTOM', mode)
+                root = self.data_path
+                self.data = ImageFolder(root=root)
+
+        elif self.dataset_name == "food101":
+            if self.hdf5_path is not None:
+                print('Loading %s into memory...' % self.hdf5_path)
+                with h5.File(self.hdf5_path, 'r') as f:
+                    self.data = f['imgs'][:]
+                    self.labels = f['labels'][:]
+            else:
+                # mode = 'train' if self.train == True else 'valid'
+                # root = os.path.join('data','CUSTOM', mode)
+                root = self.data_path
                 self.data = ImageFolder(root=root)
         else:
             raise NotImplementedError
