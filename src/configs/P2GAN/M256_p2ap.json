@@ -1,9 +1,9 @@
 {
     "data_processing":{ 
-      "dataset_name": "tiny_imagenet",
+      "dataset_name": "custom",
       "data_path": "./data/TINY_ILSVRC2012/train",
       "img_size": 256,
-      "num_classes": 100,
+      "num_classes": 1000,
       "batch_size4prcsing": 256,
       "chunk_size": 500,
       "compression": false
@@ -13,7 +13,7 @@
       "model": {
         "architecture": "big_resnet2",
         "conditional_strategy": "P2GAN",
-        "dual_proj_type": "p2",
+        "dual_proj_type": "ap-sigmoid",
         "pos_collected_numerator":false,
         "hypersphere_dim": "N/A",
         "nonlinear_embed": false,
@@ -35,7 +35,7 @@
       "optimization": {
         "optimizer": "Adam",
         "batch_size": 64,
-        "accumulation_steps": 4,
+        "accumulation_steps": 2,
         "d_lr": 0.0002,
         "g_lr": 0.00005,
         "momentum": "N/A",
@@ -71,7 +71,7 @@
         "cr_lambda":"N/A",
 
         "lambda_mi_weight": 1.0,
-        "lambda_penalty_weight": 0,
+        "lambda_penalty_weight": 1.0,
   
         "bcr": false,
         "real_lambda": "N/A",
